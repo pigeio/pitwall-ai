@@ -1,15 +1,29 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { SYSTEM_PROMPT } from "@/lib/systemPrompt";
 
-async function callWithRetry(fn, maxRetries = 3) {
+async function callWithRetry(fn, maxRetries = 2) {
   for (let attempt = 0; attempt < maxRetries; attempt++) {
     try {
       return await fn();
     } catch (error) {
-      const isRateLimit = error.message?.includes("429") || error.message?.includes("quota") || error.message?.includes("Resource has been exhausted");
+      const isRateLimit =
+        error.message?.includes("429") ||
+        error.message?.includes("quota") ||
+        error.message?.includes("Resource has been exhausted") ||
+        error.message?.includes("RESOURCE_EXHAUSTED") ||
+        error.message?.includes("TokensPerMinute");
+
       if (isRateLimit && attempt < maxRetries - 1) {
-        // Wait with exponential backoff before retrying
-        const delay = Math.pow(2, attempt + 1) * 1000; // 2s, 4s, 8s
+        // Extract retry delay from error message
+        const match = error.message?.match(/retry in ([0-9.]+)s/i);
+        let delay = match
+          ? Math.ceil(parseFloat(match[1])) * 1000
+          : 2000;
+        
+        // Cap the delay so the UI doesn't hang indefinitely (max 5 seconds)
+        delay = Math.min(delay, 5000);
+        
+        console.log(`Rate limited, waiting ${delay}ms before retry ${attempt + 2}/${maxRetries}...`);
         await new Promise((resolve) => setTimeout(resolve, delay));
         continue;
       }
@@ -44,7 +58,7 @@ export async function POST(request) {
       systemInstruction: SYSTEM_PROMPT,
     });
 
-    // Build chat history from messages (excluding the last user message)
+    // Build chat history (excluding the last user message)
     const history = messages.slice(0, -1).map((msg) => ({
       role: msg.role === "user" ? "user" : "model",
       parts: [{ text: msg.content }],
@@ -53,10 +67,9 @@ export async function POST(request) {
     const chat = model.startChat({ history });
     const lastMessage = messages[messages.length - 1].content;
 
-    // Use streaming with retry logic
+    // Use streaming with retry
     const result = await callWithRetry(() => chat.sendMessageStream(lastMessage));
 
-    // Create a readable stream
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
@@ -70,7 +83,7 @@ export async function POST(request) {
           controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();
         } catch (streamError) {
-          console.error("Stream error:", streamError);
+          console.error("Stream error:", streamError.message);
           controller.enqueue(
             encoder.encode(`data: ${JSON.stringify({ error: "Stream interrupted" })}\n\n`)
           );
@@ -89,7 +102,10 @@ export async function POST(request) {
   } catch (error) {
     console.error("Chat API error:", error.message);
 
-    const isRateLimit = error.message?.includes("429") || error.message?.includes("quota") || error.message?.includes("Resource has been exhausted");
+    const isRateLimit =
+      error.message?.includes("429") ||
+      error.message?.includes("quota") ||
+      error.message?.includes("RESOURCE_EXHAUSTED");
 
     if (isRateLimit) {
       return Response.json(
