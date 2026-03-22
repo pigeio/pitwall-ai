@@ -17,7 +17,7 @@ The "race engineer" persona gives the bot a distinct personality — it uses rad
 | Layer | Technology |
 |-------|-----------|
 | Framework | Next.js 14 (App Router) |
-| AI Backend | Google Gemini 2.0 Flash |
+| AI Backend | Groq API (Llama 3 70B) |
 | Styling | Vanilla CSS (custom design system) |
 | Deployment | Vercel |
 | Fonts | Outfit + Inter (Google Fonts) |
@@ -37,20 +37,20 @@ The "race engineer" persona gives the bot a distinct personality — it uses rad
 ### Prerequisites
 
 - Node.js 18+
-- A [Google Gemini API key](https://aistudio.google.com) (free tier available)
+- A [Groq API key](https://console.groq.com) (free tier available)
 
 ### Setup
 
 ```bash
 # Clone the repo
-git clone https://github.com/yourusername/pitwall-ai.git
+git clone https://github.com/pigeio/pitwall-ai.git
 cd pitwall-ai
 
 # Install dependencies
 npm install
 
 # Create environment file
-echo "GEMINI_API_KEY=your_api_key_here" > .env.local
+echo "GROQ_API_KEY=your_api_key_here" > .env.local
 
 # Start dev server
 npm run dev
@@ -62,7 +62,7 @@ Open [http://localhost:3000](http://localhost:3000) to start chatting.
 
 1. Push to GitHub
 2. Import the repo in [Vercel](https://vercel.com)
-3. Add `GEMINI_API_KEY` as an environment variable
+3. Add `GROQ_API_KEY` as an environment variable
 4. Deploy 🚀
 
 ## Frontend Thinking
